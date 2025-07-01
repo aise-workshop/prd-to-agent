@@ -1,0 +1,20 @@
+{
+  "name": "prd-to-agent",
+  "version": "1.0.0",
+  "description": "我正在实现一个 AI Agent，它可以根据用户的需求（结合读取前端代码和路由）自动生成 puppeteer 的 UI 测试。我希望你能参考你（Augment）的实现，帮我实现这个 AI Agent。你需要：",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phodal/prd-to-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/phodal/prd-to-agent/issues"
+  },
+  "homepage": "https://github.com/phodal/prd-to-agent#readme"
+}
