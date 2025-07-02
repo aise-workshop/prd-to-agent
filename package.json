@@ -16,5 +16,12 @@
   "bugs": {
     "url": "https://github.com/phodal/prd-to-agent/issues"
   },
-  "homepage": "https://github.com/phodal/prd-to-agent#readme"
+  "homepage": "https://github.com/phodal/prd-to-agent#readme",
+  "dependencies": {
+    "@ai-sdk/openai": "^0.0.36",
+    "@modelcontextprotocol/sdk": "*",
+    "ai": "^3.2.22",
+    "dotenv": "^16.4.5",
+    "puppeteer": "^22.13.0"
+  }
 }
