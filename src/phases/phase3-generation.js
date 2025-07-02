@@ -1,6 +1,7 @@
 const { generateAIText } = require('../config/llm-provider');
 const fs = require('fs').promises;
 const path = require('path');
+const { parseCleanJSON } = require('../utils/json-parser');
 
 /**
  * 阶段三：Puppeteer 代码生成
@@ -89,13 +90,15 @@ ${JSON.stringify(phase2Results, null, 2)}
 - 可配置的等待策略
 - 截图和日志记录
 
-请以 JSON 格式返回：
+请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
-  "main.test.js": "主测试文件代码",
-  "auth.test.js": "登录测试代码", 
-  "navigation.test.js": "导航测试代码",
-  "business-flow.test.js": "业务流程测试代码"
+  "main.test.js": "完整的JavaScript测试代码，所有引号都要转义",
+  "auth.test.js": "完整的JavaScript测试代码，所有引号都要转义",
+  "navigation.test.js": "完整的JavaScript测试代码，所有引号都要转义",
+  "business-flow.test.js": "完整的JavaScript测试代码，所有引号都要转义"
 }
+
+重要：不要在JSON中使用markdown代码块标记，直接返回纯JSON格式。
 
 代码要求：
 - 使用 Jest 测试框架
@@ -112,19 +115,10 @@ ${JSON.stringify(phase2Results, null, 2)}
     });
 
     try {
-      // 清理 LLM 响应，移除可能的 markdown 代码块标记
-      let cleanText = result.text.trim();
-      if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanText.startsWith('```')) {
-        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      const testCode = JSON.parse(cleanText);
+      const testCode = parseCleanJSON(result.text);
       console.log('📝 Generated test code files');
       return testCode;
     } catch (error) {
-      console.error('Raw LLM response:', result.text);
       throw new Error(`Failed to parse test code: ${error.message}`);
     }
   }
@@ -146,13 +140,15 @@ ${JSON.stringify(phase2Results, null, 2)}
 3. screenshot-utils.js - 截图工具
 4. data-utils.js - 测试数据工具
 
-请以 JSON 格式返回：
+请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
-  "page-utils.js": "页面操作工具代码",
-  "wait-utils.js": "等待策略工具代码",
-  "screenshot-utils.js": "截图工具代码",
-  "data-utils.js": "测试数据工具代码"
+  "page-utils.js": "完整的JavaScript工具代码，所有引号都要转义",
+  "wait-utils.js": "完整的JavaScript工具代码，所有引号都要转义",
+  "screenshot-utils.js": "完整的JavaScript工具代码，所有引号都要转义",
+  "data-utils.js": "完整的JavaScript工具代码，所有引号都要转义"
 }
+
+重要：不要在JSON中使用markdown代码块标记，直接返回纯JSON格式。
 
 工具要求：
 - 可重用的函数
@@ -205,13 +201,15 @@ ${JSON.stringify(phase2Results, null, 2)}
 3. test-data.js - 测试数据配置
 4. jest.config.js - Jest 配置
 
-请以 JSON 格式返回：
+请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
-  "test.config.js": "主配置文件代码",
-  "selectors.js": "选择器配置代码",
-  "test-data.js": "测试数据配置代码",
-  "jest.config.js": "Jest配置代码"
+  "test.config.js": "完整的JavaScript配置代码，所有引号都要转义",
+  "selectors.js": "完整的JavaScript配置代码，所有引号都要转义",
+  "test-data.js": "完整的JavaScript配置代码，所有引号都要转义",
+  "jest.config.js": "完整的JavaScript配置代码，所有引号都要转义"
 }
+
+重要：不要在JSON中使用markdown代码块标记，直接返回纯JSON格式。
 
 配置要求：
 - 环境变量支持

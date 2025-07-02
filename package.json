@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "example": "node example.js",
+    "demo": "node demo.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -24,6 +24,7 @@
     "@modelcontextprotocol/sdk": "^1.13.2",
     "ai": "^4.3.16",
     "dotenv": "^17.0.0",
+    "node-fetch": "^3.3.2",
     "puppeteer": "^24.11.2"
   }
 }

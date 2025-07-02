@@ -2,6 +2,8 @@ const { generateAIText } = require('../config/llm-provider');
 const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 const path = require('path');
+const FrontendServerManager = require('../utils/frontend-server');
+const { parseCleanJSON, safeParseJSON } = require('../utils/json-parser');
 
 /**
  * 阶段二：测试用例生成和浏览器验证
@@ -12,43 +14,57 @@ class Phase2Validation {
     this.browser = null;
     this.page = null;
     this.maxRetries = 3;
+    this.serverManager = new FrontendServerManager();
+    this.autoStartedServer = false;
   }
 
   /**
    * 执行阶段二验证
    */
-  async execute(phase1Results, frontendUrl = 'http://localhost:3000') {
+  async execute(phase1Results, frontendUrl = null) {
     console.log('🧪 Phase 2: Starting test case generation and browser validation...');
-    
+
     try {
       // 1. 基于阶段一结果生成测试用例
       const testCases = await this.generateTestCases(phase1Results);
-      
-      // 2. 启动浏览器
+
+      // 2. 自动启动前端服务器（如果没有提供URL）
+      let actualFrontendUrl = frontendUrl;
+      if (!actualFrontendUrl) {
+        console.log('🚀 No frontend URL provided, attempting to auto-start server...');
+        const serverInfo = await this.serverManager.autoStart(phase1Results.projectPath);
+        actualFrontendUrl = serverInfo.url;
+        this.autoStartedServer = true;
+        console.log(`✅ Frontend server auto-started at: ${actualFrontendUrl}`);
+      }
+
+      // 3. 启动浏览器
       await this.initializeBrowser();
-      
-      // 3. 验证测试用例（支持重试）
-      const validationResults = await this.validateTestCases(testCases, frontendUrl);
-      
-      // 4. 生成DOM选择器映射
+
+      // 4. 验证测试用例（支持重试）
+      const validationResults = await this.validateTestCases(testCases, actualFrontendUrl);
+
+      // 5. 生成DOM选择器映射
       const domMapping = await this.generateDOMMapping(validationResults);
-      
-      // 5. 优化测试路径
+
+      // 6. 优化测试路径
       const optimizedPaths = await this.optimizeTestPaths(testCases, validationResults);
-      
-      await this.closeBrowser();
-      
+
+      await this.cleanup();
+
       return {
         success: true,
         testCases,
         validationResults,
         domMapping,
         optimizedPaths,
+        frontendUrl: actualFrontendUrl,
+        autoStartedServer: this.autoStartedServer,
         phase: 2
       };
     } catch (error) {
       console.error('❌ Phase 2 failed:', error);
-      await this.closeBrowser();
+      await this.cleanup();
       return {
         success: false,
         error: error.message,
@@ -120,19 +136,10 @@ ${JSON.stringify(phase1Results.analysis, null, 2)}
     });
 
     try {
-      // 清理 LLM 响应，移除可能的 markdown 代码块标记
-      let cleanText = result.text.trim();
-      if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanText.startsWith('```')) {
-        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      const testCases = JSON.parse(cleanText);
+      const testCases = parseCleanJSON(result.text);
       console.log(`📝 Generated ${testCases.testSuites?.length || 0} test suites with ${testCases.testPaths?.length || 0} test paths`);
       return testCases;
     } catch (error) {
-      console.error('Raw LLM response:', result.text);
       throw new Error(`Failed to parse test cases: ${error.message}`);
     }
   }
@@ -324,21 +331,12 @@ ${JSON.stringify(validationResults, null, 2)}
     });
 
     try {
-      // 清理 LLM 响应，移除可能的 markdown 代码块标记
-      let cleanText = result.text.trim();
-      if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanText.startsWith('```')) {
-        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      const domMapping = JSON.parse(cleanText);
+      const domMapping = parseCleanJSON(result.text);
       console.log('🎯 Generated DOM selector mapping');
       return domMapping;
     } catch (error) {
       console.warn('Failed to generate DOM mapping:', error.message);
-      console.warn('Raw LLM response:', result.text);
-      return { selectors: {}, waitStrategies: {} };
+      return safeParseJSON(result.text, { selectors: {}, waitStrategies: {} });
     }
   }
 
@@ -389,21 +387,12 @@ ${JSON.stringify(validationResults, null, 2)}
     });
 
     try {
-      // 清理 LLM 响应，移除可能的 markdown 代码块标记
-      let cleanText = result.text.trim();
-      if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanText.startsWith('```')) {
-        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      const optimizedPaths = JSON.parse(cleanText);
+      const optimizedPaths = parseCleanJSON(result.text);
       console.log('⚡ Generated optimized test paths');
       return optimizedPaths;
     } catch (error) {
       console.warn('Failed to optimize test paths:', error.message);
-      console.warn('Raw LLM response:', result.text);
-      return { optimizedPaths: [], executionStrategy: {} };
+      return safeParseJSON(result.text, { optimizedPaths: [], executionStrategy: {} });
     }
   }
 
@@ -416,6 +405,18 @@ ${JSON.stringify(validationResults, null, 2)}
       this.browser = null;
       this.page = null;
       console.log('🔒 Browser closed');
+    }
+  }
+
+  /**
+   * 清理资源（浏览器和服务器）
+   */
+  async cleanup() {
+    await this.closeBrowser();
+
+    if (this.autoStartedServer) {
+      await this.serverManager.stopServer();
+      this.autoStartedServer = false;
     }
   }
 

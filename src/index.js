@@ -18,7 +18,7 @@ class PuppeteerTestAgent {
   /**
    * 执行完整的测试生成流程
    */
-  async generateTests(userInput, projectPath, frontendUrl = 'http://localhost:3000') {
+  async generateTests(userInput, projectPath, frontendUrl = null) {
     console.log('🚀 Starting Puppeteer Test Generation Agent...');
     console.log(`📝 User Input: ${userInput}`);
     console.log(`📁 Project Path: ${projectPath}`);
