@@ -78,17 +78,19 @@ ${JSON.stringify(phase2Results, null, 2)}
 
 请生成以下结构的测试代码：
 
-1. 主测试文件 (main.test.js)
-2. 登录测试 (auth.test.js)
-3. 导航测试 (navigation.test.js)
-4. 业务流程测试 (business-flow.test.js)
+1. 主测试文件 (main.test.js): 包含测试入口和通用设置。
+2. 登录测试 (auth.test.js): 针对登录流程的测试。
+3. 导航测试 (navigation.test.js): 验证主要页面间的导航。
+4. 业务流程测试 (business-flow.test.js): 针对核心业务流程的测试。
 
 每个测试文件应该包含：
-- 完整的 Puppeteer 测试代码
-- 适当的错误处理
-- 清晰的注释
-- 可配置的等待策略
-- 截图和日志记录
+- 完整的 Puppeteer 测试代码，使用 Jest 框架。
+- 适当的错误处理和断言。
+- 清晰的注释。
+- 可配置的等待策略，利用 phase2Results.domMapping.waitStrategies。
+- 截图和日志记录。
+- 使用 phase2Results.optimizedPaths 中的优化路径和步骤。
+- 使用 phase2Results.domMapping.selectors 中的 DOM 选择器。
 
 请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
@@ -107,6 +109,7 @@ ${JSON.stringify(phase2Results, null, 2)}
 - 包含详细的断言
 - 支持并行执行
 - 包含重试机制
+- 充分利用提供的 optimizedPaths 和 selectors 信息。
 `;
 
     const result = await generateAIText(prompt, {
@@ -135,10 +138,10 @@ ${JSON.stringify(phase2Results, null, 2)}
 
 请生成以下辅助工具：
 
-1. page-utils.js - 页面操作工具
-2. wait-utils.js - 等待策略工具
-3. screenshot-utils.js - 截图工具
-4. data-utils.js - 测试数据工具
+1. page-utils.js - 页面操作工具，包含点击、输入、导航等常用操作，并集成等待策略和错误处理。
+2. wait-utils.js - 等待策略工具，封装 Puppeteer 的等待函数，并根据 phase2Results.domMapping.waitStrategies 提供建议的等待方法。
+3. screenshot-utils.js - 截图工具，提供截图保存和比较功能。
+4. data-utils.js - 测试数据工具，用于管理测试数据，可以考虑从外部文件加载或生成模拟数据。
 
 请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
@@ -156,6 +159,7 @@ ${JSON.stringify(phase2Results, null, 2)}
 - 详细注释
 - 支持配置
 - 日志记录
+- 充分利用 phase2Results 中的信息，特别是 domMapping 和 optimizedPaths。
 `;
 
     const result = await generateAIText(prompt, {
@@ -196,10 +200,10 @@ ${JSON.stringify(phase2Results, null, 2)}
 
 请生成以下配置文件：
 
-1. test.config.js - 主配置文件
-2. selectors.js - 选择器配置
-3. test-data.js - 测试数据配置
-4. jest.config.js - Jest 配置
+1. test.config.js - 主配置文件，包含 Puppeteer 启动选项、超时设置、报告路径等。
+2. selectors.js - 选择器配置，包含 phase2Results.domMapping.selectors 中生成的所有 DOM 选择器。
+3. test-data.js - 测试数据配置，包含登录凭据、测试用户数据等，并强调敏感信息应从环境变量加载。
+4. jest.config.js - Jest 配置，确保与 Puppeteer 和测试结构兼容。
 
 请以 JSON 格式返回，注意代码中的引号需要正确转义：
 {
@@ -216,6 +220,7 @@ ${JSON.stringify(phase2Results, null, 2)}
 - 可扩展性
 - 清晰的结构
 - 详细注释
+- 充分利用 phase1Results 和 phase2Results 中的信息。
 `;
 
     const result = await generateAIText(prompt, {
@@ -288,21 +293,19 @@ ${JSON.stringify(phase2Results, null, 2)}
 项目分析：
 ${JSON.stringify(phase1Results.analysis, null, 2)}
 
-验证结果摘要：
-- 成功验证的测试路径数量
-- 发现的主要页面元素
-- 识别的测试场景
+验证结果：
+${JSON.stringify(phase2Results, null, 2)}
 
 请生成 Markdown 格式的 README.md 文档，包含：
 
-1. 项目概述
-2. 安装说明
-3. 配置说明
-4. 运行测试
-5. 测试结构说明
-6. 自定义和扩展
-7. 故障排除
-8. 生成过程说明
+1. 项目概述：简要介绍生成的 Puppeteer UI 测试项目。
+2. 安装说明：详细说明如何安装依赖。
+3. 配置说明：如何配置测试环境，包括环境变量和测试数据。
+4. 运行测试：如何执行测试，包括不同的测试脚本。
+5. 测试结构说明：生成的测试文件和辅助工具的结构。
+6. 自定义和扩展：如何修改和扩展生成的测试。
+7. 故障排除：常见问题及解决方案。
+8. 生成过程说明：简要回顾 AI Agent 的生成过程。
 
 文档应该详细、易懂，包含代码示例和最佳实践。
 `;

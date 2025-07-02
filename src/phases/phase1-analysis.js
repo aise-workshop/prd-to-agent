@@ -61,11 +61,13 @@ class Phase1Analysis {
 可用工具：
 ${JSON.stringify(toolDefinitions, null, 2)}
 
-请分析用户需求，生成一个工具调用计划来：
-1. 分析项目结构
-2. 找到路由配置
-3. 识别关键页面和组件
-4. 理解登录流程和认证机制
+请分析用户需求，并生成一个工具调用计划。你的目标是：
+1. 深入分析前端项目结构，包括检测框架类型。
+2. 详细识别所有路由配置，包括嵌套路由、路由参数、关联组件以及是否需要认证。
+3. 识别关键页面和组件，特别是那些与用户交互、数据展示和业务流程相关的。
+4. 全面理解登录流程和认证机制，包括登录页面、登录方式和受保护的路由。
+
+请务必在工具调用计划中包含对 'analyze_routes' 工具的调用，并提供 'projectPath' 和 'framework' 参数（如果已知）。
 
 请以 JSON 格式返回工具调用计划：
 {
@@ -156,7 +158,8 @@ ${JSON.stringify(toolResults, null, 2)}
       "path": "路由路径",
       "component": "对应组件",
       "description": "页面描述",
-      "requiresAuth": "是否需要认证"
+      "requiresAuth": "是否需要认证",
+      "file": "路由定义所在文件"
     }
   ],
   "authFlow": {
@@ -170,7 +173,8 @@ ${JSON.stringify(toolResults, null, 2)}
       "name": "测试场景名称",
       "description": "场景描述",
       "steps": ["步骤1", "步骤2"],
-      "priority": "优先级 (high/medium/low)"
+      "priority": "优先级 (high/medium/low)",
+      "associatedRoutes": ["相关路由路径"]
     }
   ],
   "recommendations": [
@@ -180,10 +184,11 @@ ${JSON.stringify(toolResults, null, 2)}
 }
 
 重点关注：
-1. 识别登录流程和认证机制
-2. 找出主要的用户操作路径
-3. 确定需要测试的关键功能
-4. 分析页面间的导航关系
+1. 识别登录流程和认证机制，包括登录页面、登录方式和受保护的路由。
+2. 找出主要的用户操作路径，并将其与具体的路由和组件关联起来。
+3. 确定需要测试的关键功能，并为每个功能生成详细的测试场景。
+4. 分析页面间的导航关系，特别是那些涉及认证和授权的页面。
+5. 确保分析结果能够直接用于生成 Puppeteer 测试用例。
 `;
 
     const result = await generateAIText(prompt, {

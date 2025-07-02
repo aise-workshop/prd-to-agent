@@ -302,28 +302,93 @@ class MCPToolManager {
    * 分析 React 路由
    */
   async analyzeReactRoutes(projectPath, routes) {
-    // 查找路由配置文件
     const routeFiles = await this.findRouteFiles(projectPath, ['.js', '.jsx', '.ts', '.tsx']);
-    
+
     for (const file of routeFiles) {
       const content = await fs.readFile(file, 'utf-8');
-      
-      // 匹配 React Router 路由定义
-      const routePatterns = [
-        /<Route[^>]+path=["']([^"']+)["'][^>]*>/g,
-        /path:\s*["']([^"']+)["']/g,
-        /createBrowserRouter\s*\(\s*\[[\s\S]*?\]/g
-      ];
+      const relativeFilePath = path.relative(projectPath, file);
 
-      for (const pattern of routePatterns) {
-        const matches = [...content.matchAll(pattern)];
-        for (const match of matches) {
-          if (match[1]) {
+      // Regex to find <Route path="..." element={<Component />} />
+      const routeComponentRegex = /<Route\s+path=["']([^"']+)["']\s+(?:element={([^}]+)})?[^>]*\/?>/g;
+      let match;
+      while ((match = routeComponentRegex.exec(content)) !== null) {
+        const path = match[1];
+        const elementContent = match[2];
+        let component = 'Unknown';
+        let requiresAuth = false;
+
+        if (elementContent) {
+          // Try to extract component name
+          const componentMatch = elementContent.match(/<(\w+)(?:\s|\/|>)/);
+          if (componentMatch) {
+            component = componentMatch[1];
+          }
+          // Check for ProtectedRoute or similar patterns
+          if (elementContent.includes('ProtectedRoute') || elementContent.includes('AuthGuard')) {
+            requiresAuth = true;
+          }
+        }
+
+        routes.push({
+          path,
+          file: relativeFilePath,
+          type: 'RouteComponent',
+          component,
+          requiresAuth,
+        });
+      }
+
+      // Regex to find route objects in arrays (e.g., in createBrowserRouter or useRoutes)
+      // This is a simplified approach and might need AST for full accuracy
+      const routeObjectRegex = /{([^}]+)}/g;
+      const arrayContentMatches = [...content.matchAll(/(?:createBrowserRouter|useRoutes)\s*\(\s*\[([\s\S]*?)\]/g)];
+
+      for (const arrayMatch of arrayContentMatches) {
+        const arrayContent = arrayMatch[1];
+        let objMatch;
+        while ((objMatch = routeObjectRegex.exec(arrayContent)) !== null) {
+          const objContent = objMatch[1];
+          const pathMatch = objContent.match(/path:\s*["']([^"']+)["']/);
+          const elementMatch = objContent.match(/element:\s*([^,]+)/);
+          const childrenMatch = objContent.match(/children:\s*\[([\s\S]*?)\]/);
+
+          if (pathMatch) {
+            const path = pathMatch[1];
+            let component = 'Unknown';
+            let requiresAuth = false;
+
+            if (elementMatch) {
+              const elementContent = elementMatch[1];
+              const componentNameMatch = elementContent.match(/<(\w+)(?:\s|\/|>)/);
+              if (componentNameMatch) {
+                component = componentNameMatch[1];
+              }
+              if (elementContent.includes('ProtectedRoute') || elementContent.includes('AuthGuard')) {
+                requiresAuth = true;
+              }
+            }
+
             routes.push({
-              path: match[1],
-              file: path.relative(projectPath, file),
-              type: 'route'
+              path,
+              file: relativeFilePath,
+              type: 'RouteObject',
+              component,
+              requiresAuth,
             });
+
+            // Handle nested routes (simplified: just look for children array)
+            if (childrenMatch) {
+              // For now, we'll just note the presence of children.
+              // A full implementation would recursively parse these children.
+              routes.push({
+                path: `${path}/*`, // Indicate nested routes
+                file: relativeFilePath,
+                type: 'NestedRouteParent',
+                component: 'Unknown', // Can't easily determine parent component from here
+                requiresAuth: false,
+                description: `Contains nested routes: ${childrenMatch[1].substring(0, 50)}...`
+              });
+            }
           }
         }
       }
@@ -362,11 +427,65 @@ class MCPToolManager {
 
   // Vue 和 Angular 路由分析方法可以后续扩展
   async analyzeVueRoutes(projectPath, routes) {
-    // TODO: 实现 Vue 路由分析
+    const routeFiles = await this.findRouteFiles(projectPath, ['.js', '.ts']);
+
+    for (const file of routeFiles) {
+      const content = await fs.readFile(file, 'utf-8');
+      const relativeFilePath = path.relative(projectPath, file);
+
+      // Regex to find routes array in Vue Router configuration
+      const vueRouteRegex = /routes:\s*\[([\s\S]*?)\]/g;
+      let match;
+      while ((match = vueRouteRegex.exec(content)) !== null) {
+        const routesContent = match[1];
+        const singleRouteRegex = /{\s*path:\s*["']([^"]+)["'](?:,\s*name:\s*["']([^"]+)["'])?(?:,\s*component:\s*([^,\n]+))?[^}]*}/g;
+        let routeMatch;
+        while ((routeMatch = singleRouteRegex.exec(routesContent)) !== null) {
+          const path = routeMatch[1];
+          const name = routeMatch[2] || 'Unknown';
+          const component = routeMatch[3] ? routeMatch[3].trim() : 'Unknown';
+
+          routes.push({
+            path,
+            file: relativeFilePath,
+            type: 'VueRoute',
+            name,
+            component,
+            requiresAuth: content.includes('meta: { requiresAuth: true }') // Simplified check
+          });
+        }
+      }
+    }
   }
 
   async analyzeAngularRoutes(projectPath, routes) {
-    // TODO: 实现 Angular 路由分析
+    const routeFiles = await this.findRouteFiles(projectPath, ['.ts']);
+
+    for (const file of routeFiles) {
+      const content = await fs.readFile(file, 'utf-8');
+      const relativeFilePath = path.relative(projectPath, file);
+
+      // Regex to find routes array in Angular Router configuration
+      const angularRouteRegex = /const\s+\w+Routes:\s*Routes\s*=\s*\[([\s\S]*?)\];/g;
+      let match;
+      while ((match = angularRouteRegex.exec(content)) !== null) {
+        const routesContent = match[1];
+        const singleRouteRegex = /{\s*path:\s*["']([^"']+)["'](?:,\s*component:\s*([^,\n]+))?[^}]*}/g;
+        let routeMatch;
+        while ((routeMatch = singleRouteRegex.exec(routesContent)) !== null) {
+          const path = routeMatch[1];
+          const component = routeMatch[2] ? routeMatch[2].trim() : 'Unknown';
+
+          routes.push({
+            path,
+            file: relativeFilePath,
+            type: 'AngularRoute',
+            component,
+            requiresAuth: content.includes('canActivate: [AuthGuard]') // Simplified check
+          });
+        }
+      }
+    }
   }
 }
 

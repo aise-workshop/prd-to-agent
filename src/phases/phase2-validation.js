@@ -237,6 +237,13 @@ ${JSON.stringify(phase1Results.analysis, null, 2)}
     // 等待页面加载
     await this.delay(2000);
     
+    // 执行测试路径中的步骤
+    for (const step of testPath.steps) {
+      console.log(`      Performing step: ${step.description || step.action}`);
+      await this.performStep(this.page, step);
+      await this.delay(500); // 短暂延迟，确保页面状态更新
+    }
+
     // 截图保存
     const screenshotPath = `screenshots/validation_${testPath.name.replace(/\s+/g, '_')}_${Date.now()}.png`;
     await this.ensureDirectoryExists(path.dirname(screenshotPath));
@@ -244,9 +251,35 @@ ${JSON.stringify(phase1Results.analysis, null, 2)}
     
     // 获取页面信息
     const pageInfo = await this.page.evaluate(() => {
+      const getElementInfo = (el) => ({
+        tagName: el.tagName,
+        id: el.id,
+        className: el.className,
+        name: el.name,
+        text: el.textContent.trim().substring(0, 100), // Limit text length
+        value: el.value,
+        type: el.type,
+        placeholder: el.placeholder,
+        href: el.href,
+        src: el.src,
+        visible: el.offsetParent !== null,
+        bounds: el.getBoundingClientRect ? {
+          x: el.getBoundingClientRect().x,
+          y: el.getBoundingClientRect().y,
+          width: el.getBoundingClientRect().width,
+          height: el.getBoundingClientRect().height,
+        } : null,
+      });
+
+      const allElements = Array.from(document.querySelectorAll('input, button, a, form, textarea, select, [role="button"], [role="link"]'));
+      const interactiveElements = allElements.map(getElementInfo);
+
       return {
         title: document.title,
         url: window.location.href,
+        htmlContent: document.documentElement.outerHTML.substring(0, 5000), // Capture a snippet of HTML
+        interactiveElements,
+        // Deprecated, but kept for backward compatibility if needed
         hasLoginForm: !!document.querySelector('form[action*="login"], form input[type="password"], .login-form'),
         hasNavigation: !!document.querySelector('nav, .navbar, .navigation'),
         formElements: Array.from(document.querySelectorAll('form')).map(form => ({
@@ -280,6 +313,58 @@ ${JSON.stringify(phase1Results.analysis, null, 2)}
   }
 
   /**
+   * 执行单个测试步骤
+   */
+  async performStep(page, step) {
+    const { action, target, value, description } = step;
+
+    try {
+      switch (action) {
+        case 'navigate':
+          await page.goto(target, { waitUntil: 'networkidle2' });
+          break;
+        case 'click':
+          await page.waitForSelector(target, { visible: true });
+          await page.click(target);
+          break;
+        case 'type':
+          await page.waitForSelector(target, { visible: true });
+          await page.type(target, value);
+          break;
+        case 'wait':
+          if (typeof target === 'number') { // wait for a duration
+            await this.delay(target);
+          } else if (target.startsWith('#') || target.startsWith('.') || target.startsWith('[')) { // wait for selector
+            await page.waitForSelector(target, { visible: true });
+          } else { // wait for navigation
+            await page.waitForNavigation({ waitUntil: 'networkidle2' });
+          }
+          break;
+        case 'assert':
+          // This is a basic assertion, more complex assertions would be in generated code
+          if (target === 'url') {
+            const currentUrl = page.url();
+            if (!currentUrl.includes(value)) {
+              throw new Error(`Assertion failed: URL "${currentUrl}" does not contain "${value}"`);
+            }
+          } else {
+            const element = await page.$(target);
+            if (!element) {
+              throw new Error(`Assertion failed: Element "${target}" not found`);
+            }
+            // More assertions can be added here (e.g., text content, visibility)
+          }
+          break;
+        default:
+          console.warn(`Unknown action type: ${action}`);
+      }
+    } catch (error) {
+      console.error(`Error performing step "${description || action}" on target "${target}": ${error.message}`);
+      throw error; // Re-throw to fail the validation
+    }
+  }
+
+  /**
    * 生成DOM选择器映射
    */
   async generateDOMMapping(validationResults) {
@@ -288,6 +373,8 @@ ${JSON.stringify(phase1Results.analysis, null, 2)}
 
 验证结果：
 ${JSON.stringify(validationResults, null, 2)}
+
+特别注意 validationResults 中的 pageInfo.interactiveElements，它们包含了页面上可交互元素的详细信息。
 
 请分析页面元素，生成选择器映射的JSON格式：
 {
@@ -307,6 +394,10 @@ ${JSON.stringify(validationResults, null, 2)}
       "loadingSpinner": "加载动画选择器",
       "successMessage": "成功消息选择器",
       "modal": "模态框选择器"
+    },
+    "dynamic": { // 用于存放动态或特定业务场景的选择器
+      "productItem": "产品列表项选择器",
+      "addToCartButton": "添加到购物车按钮选择器"
     }
   },
   "waitStrategies": {
@@ -322,7 +413,7 @@ ${JSON.stringify(validationResults, null, 2)}
 3. 稳定的 class 名称
 4. 语义化的元素选择器
 
-避免使用容易变化的选择器。
+避免使用容易变化的选择器。对于输入框，优先使用 name 或 placeholder 属性。对于按钮和链接，优先使用文本内容或 aria-label。
 `;
 
     const result = await generateAIText(prompt, {
@@ -345,7 +436,7 @@ ${JSON.stringify(validationResults, null, 2)}
    */
   async optimizeTestPaths(testCases, validationResults) {
     const prompt = `
-基于测试用例和验证结果，优化测试路径，提供最佳的测试执行顺序和策略。
+基于测试用例、验证结果和 DOM 选择器映射，优化测试路径，提供最佳的测试执行顺序和策略。
 
 原始测试用例：
 ${JSON.stringify(testCases, null, 2)}
@@ -364,10 +455,10 @@ ${JSON.stringify(validationResults, null, 2)}
       "dependencies": ["依赖的其他测试"],
       "steps": [
         {
-          "action": "操作类型",
-          "selector": "元素选择器",
+          "action": "操作类型 (navigate/click/type/wait/assert)",
+          "selector": "元素选择器 (使用DOM映射中生成的最优选择器)",
           "value": "输入值",
-          "waitCondition": "等待条件",
+          "waitCondition": "等待条件 (例如: 'networkidle2', '#elementId', 2000)",
           "description": "步骤描述"
         }
       ]
@@ -379,6 +470,13 @@ ${JSON.stringify(validationResults, null, 2)}
     "setupTeardown": "设置和清理策略"
   }
 }
+
+优化重点：
+1. 确保每个步骤都使用最稳定、最精确的 DOM 选择器。
+2. 考虑页面加载、AJAX 请求和元素可见性等等待策略。
+3. 识别并处理测试路径中的依赖关系，确保测试顺序的正确性。
+4. 尽可能地将测试路径并行化，以提高执行效率。
+5. 为每个步骤提供清晰的描述，以便于理解和调试。
 `;
 
     const result = await generateAIText(prompt, {
