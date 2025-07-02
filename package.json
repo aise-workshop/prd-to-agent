@@ -1,9 +1,11 @@
 {
   "name": "prd-to-agent",
   "version": "1.0.0",
-  "description": "我正在实现一个 AI Agent，它可以根据用户的需求（结合读取前端代码和路由）自动生成 puppeteer 的 UI 测试。我希望你能参考你（Augment）的实现，帮我实现这个 AI Agent。你需要：",
-  "main": "index.js",
+  "description": "AI Agent for automatically generating Puppeteer UI tests based on frontend code analysis and user requirements. Uses a three-phase architecture: tool calling, test case generation with browser validation, and code generation.",
+  "main": "src/index.js",
   "scripts": {
+    "start": "node src/index.js",
+    "example": "node example.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -16,5 +18,12 @@
   "bugs": {
     "url": "https://github.com/phodal/prd-to-agent/issues"
   },
-  "homepage": "https://github.com/phodal/prd-to-agent#readme"
+  "homepage": "https://github.com/phodal/prd-to-agent#readme",
+  "dependencies": {
+    "@ai-sdk/openai": "^1.3.22",
+    "@modelcontextprotocol/sdk": "^1.13.2",
+    "ai": "^4.3.16",
+    "dotenv": "^17.0.0",
+    "puppeteer": "^24.11.2"
+  }
 }

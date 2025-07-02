@@ -1,0 +1,441 @@
+const { generateAIText } = require('../config/llm-provider');
+const puppeteer = require('puppeteer');
+const fs = require('fs').promises;
+const path = require('path');
+
+/**
+ * 阶段二：测试用例生成和浏览器验证
+ * 生成测试用例和路径，启动浏览器进行验证，支持重试机制
+ */
+class Phase2Validation {
+  constructor() {
+    this.browser = null;
+    this.page = null;
+    this.maxRetries = 3;
+  }
+
+  /**
+   * 执行阶段二验证
+   */
+  async execute(phase1Results, frontendUrl = 'http://localhost:3000') {
+    console.log('🧪 Phase 2: Starting test case generation and browser validation...');
+    
+    try {
+      // 1. 基于阶段一结果生成测试用例
+      const testCases = await this.generateTestCases(phase1Results);
+      
+      // 2. 启动浏览器
+      await this.initializeBrowser();
+      
+      // 3. 验证测试用例（支持重试）
+      const validationResults = await this.validateTestCases(testCases, frontendUrl);
+      
+      // 4. 生成DOM选择器映射
+      const domMapping = await this.generateDOMMapping(validationResults);
+      
+      // 5. 优化测试路径
+      const optimizedPaths = await this.optimizeTestPaths(testCases, validationResults);
+      
+      await this.closeBrowser();
+      
+      return {
+        success: true,
+        testCases,
+        validationResults,
+        domMapping,
+        optimizedPaths,
+        phase: 2
+      };
+    } catch (error) {
+      console.error('❌ Phase 2 failed:', error);
+      await this.closeBrowser();
+      return {
+        success: false,
+        error: error.message,
+        phase: 2
+      };
+    }
+  }
+
+  /**
+   * 生成测试用例
+   */
+  async generateTestCases(phase1Results) {
+    const prompt = `
+基于阶段一的分析结果，生成详细的 UI 测试用例。
+
+分析结果：
+${JSON.stringify(phase1Results.analysis, null, 2)}
+
+请生成测试用例，包含以下信息的 JSON 格式：
+{
+  "testSuites": [
+    {
+      "name": "测试套件名称",
+      "description": "套件描述",
+      "priority": "high/medium/low",
+      "testCases": [
+        {
+          "name": "测试用例名称",
+          "description": "测试描述",
+          "steps": [
+            {
+              "action": "操作类型 (navigate/click/type/wait/assert)",
+              "target": "目标元素描述",
+              "value": "输入值或期望值",
+              "description": "步骤描述"
+            }
+          ],
+          "expectedResults": ["期望结果1", "期望结果2"],
+          "prerequisites": ["前置条件1", "前置条件2"]
+        }
+      ]
+    }
+  ],
+  "testPaths": [
+    {
+      "name": "测试路径名称",
+      "description": "路径描述",
+      "startUrl": "起始URL",
+      "steps": ["步骤1", "步骤2", "步骤3"],
+      "endUrl": "结束URL",
+      "businessValue": "业务价值描述"
+    }
+  ]
+}
+
+重点生成以下类型的测试：
+1. 登录流程测试
+2. 主要业务流程测试
+3. 导航和路由测试
+4. 表单提交测试
+5. 错误处理测试
+
+确保测试用例具体、可执行，包含明确的操作步骤和验证点。
+`;
+
+    const result = await generateAIText(prompt, {
+      temperature: 0.3,
+      maxTokens: 4000
+    });
+
+    try {
+      // 清理 LLM 响应，移除可能的 markdown 代码块标记
+      let cleanText = result.text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const testCases = JSON.parse(cleanText);
+      console.log(`📝 Generated ${testCases.testSuites?.length || 0} test suites with ${testCases.testPaths?.length || 0} test paths`);
+      return testCases;
+    } catch (error) {
+      console.error('Raw LLM response:', result.text);
+      throw new Error(`Failed to parse test cases: ${error.message}`);
+    }
+  }
+
+  /**
+   * 初始化浏览器
+   */
+  async initializeBrowser() {
+    console.log('🚀 Launching browser...');
+    this.browser = await puppeteer.launch({
+      headless: false, // 设为 false 以便观察测试过程
+      defaultViewport: { width: 1280, height: 720 },
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    this.page = await this.browser.newPage();
+    
+    // 设置用户代理
+    await this.page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+    
+    // 启用请求拦截以便调试
+    await this.page.setRequestInterception(true);
+    this.page.on('request', (request) => {
+      request.continue();
+    });
+    
+    console.log('✅ Browser initialized');
+  }
+
+  /**
+   * 验证测试用例
+   */
+  async validateTestCases(testCases, frontendUrl) {
+    const validationResults = [];
+    
+    for (const testPath of testCases.testPaths) {
+      console.log(`🔍 Validating test path: ${testPath.name}`);
+      
+      let attempt = 0;
+      let success = false;
+      let lastError = null;
+      
+      while (attempt < this.maxRetries && !success) {
+        attempt++;
+        console.log(`  Attempt ${attempt}/${this.maxRetries}`);
+        
+        try {
+          const result = await this.validateSinglePath(testPath, frontendUrl);
+          validationResults.push({
+            testPath: testPath.name,
+            success: true,
+            attempt,
+            result,
+            timestamp: new Date().toISOString()
+          });
+          success = true;
+          console.log(`  ✅ Validation successful on attempt ${attempt}`);
+        } catch (error) {
+          lastError = error;
+          console.log(`  ❌ Attempt ${attempt} failed: ${error.message}`);
+          
+          if (attempt < this.maxRetries) {
+            console.log(`  ⏳ Waiting before retry...`);
+            await this.delay(2000);
+          }
+        }
+      }
+      
+      if (!success) {
+        validationResults.push({
+          testPath: testPath.name,
+          success: false,
+          attempts: this.maxRetries,
+          error: lastError.message,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`  ❌ All attempts failed for ${testPath.name}`);
+      }
+    }
+    
+    return validationResults;
+  }
+
+  /**
+   * 验证单个测试路径
+   */
+  async validateSinglePath(testPath, frontendUrl) {
+    const startUrl = testPath.startUrl.startsWith('http') 
+      ? testPath.startUrl 
+      : `${frontendUrl}${testPath.startUrl}`;
+    
+    console.log(`    Navigating to: ${startUrl}`);
+    await this.page.goto(startUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    // 等待页面加载
+    await this.delay(2000);
+    
+    // 截图保存
+    const screenshotPath = `screenshots/validation_${testPath.name.replace(/\s+/g, '_')}_${Date.now()}.png`;
+    await this.ensureDirectoryExists(path.dirname(screenshotPath));
+    await this.page.screenshot({ path: screenshotPath, fullPage: true });
+    
+    // 获取页面信息
+    const pageInfo = await this.page.evaluate(() => {
+      return {
+        title: document.title,
+        url: window.location.href,
+        hasLoginForm: !!document.querySelector('form[action*="login"], form input[type="password"], .login-form'),
+        hasNavigation: !!document.querySelector('nav, .navbar, .navigation'),
+        formElements: Array.from(document.querySelectorAll('form')).map(form => ({
+          action: form.action,
+          method: form.method,
+          inputs: Array.from(form.querySelectorAll('input')).map(input => ({
+            type: input.type,
+            name: input.name,
+            placeholder: input.placeholder
+          }))
+        })),
+        buttons: Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"]')).map(btn => ({
+          text: btn.textContent || btn.value,
+          type: btn.type,
+          className: btn.className
+        })),
+        links: Array.from(document.querySelectorAll('a[href]')).map(link => ({
+          text: link.textContent,
+          href: link.href,
+          className: link.className
+        }))
+      };
+    });
+    
+    return {
+      url: startUrl,
+      pageInfo,
+      screenshot: screenshotPath,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 生成DOM选择器映射
+   */
+  async generateDOMMapping(validationResults) {
+    const prompt = `
+基于浏览器验证结果，生成DOM选择器映射，用于后续的Puppeteer测试代码生成。
+
+验证结果：
+${JSON.stringify(validationResults, null, 2)}
+
+请分析页面元素，生成选择器映射的JSON格式：
+{
+  "selectors": {
+    "login": {
+      "usernameInput": "用户名输入框选择器",
+      "passwordInput": "密码输入框选择器", 
+      "submitButton": "登录按钮选择器",
+      "errorMessage": "错误信息选择器"
+    },
+    "navigation": {
+      "homeLink": "首页链接选择器",
+      "profileLink": "个人资料链接选择器",
+      "logoutButton": "退出按钮选择器"
+    },
+    "common": {
+      "loadingSpinner": "加载动画选择器",
+      "successMessage": "成功消息选择器",
+      "modal": "模态框选择器"
+    }
+  },
+  "waitStrategies": {
+    "pageLoad": "页面加载等待策略",
+    "ajaxComplete": "AJAX完成等待策略",
+    "elementVisible": "元素可见等待策略"
+  }
+}
+
+选择器应该优先使用：
+1. data-testid 属性
+2. id 属性
+3. 稳定的 class 名称
+4. 语义化的元素选择器
+
+避免使用容易变化的选择器。
+`;
+
+    const result = await generateAIText(prompt, {
+      temperature: 0.2,
+      maxTokens: 2000
+    });
+
+    try {
+      // 清理 LLM 响应，移除可能的 markdown 代码块标记
+      let cleanText = result.text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const domMapping = JSON.parse(cleanText);
+      console.log('🎯 Generated DOM selector mapping');
+      return domMapping;
+    } catch (error) {
+      console.warn('Failed to generate DOM mapping:', error.message);
+      console.warn('Raw LLM response:', result.text);
+      return { selectors: {}, waitStrategies: {} };
+    }
+  }
+
+  /**
+   * 优化测试路径
+   */
+  async optimizeTestPaths(testCases, validationResults) {
+    const prompt = `
+基于测试用例和验证结果，优化测试路径，提供最佳的测试执行顺序和策略。
+
+原始测试用例：
+${JSON.stringify(testCases, null, 2)}
+
+验证结果：
+${JSON.stringify(validationResults, null, 2)}
+
+请生成优化后的测试路径：
+{
+  "optimizedPaths": [
+    {
+      "name": "优化路径名称",
+      "description": "路径描述",
+      "priority": "执行优先级",
+      "estimatedDuration": "预估执行时间",
+      "dependencies": ["依赖的其他测试"],
+      "steps": [
+        {
+          "action": "操作类型",
+          "selector": "元素选择器",
+          "value": "输入值",
+          "waitCondition": "等待条件",
+          "description": "步骤描述"
+        }
+      ]
+    }
+  ],
+  "executionStrategy": {
+    "parallelizable": ["可并行执行的测试"],
+    "sequential": ["必须顺序执行的测试"],
+    "setupTeardown": "设置和清理策略"
+  }
+}
+`;
+
+    const result = await generateAIText(prompt, {
+      temperature: 0.3,
+      maxTokens: 3000
+    });
+
+    try {
+      // 清理 LLM 响应，移除可能的 markdown 代码块标记
+      let cleanText = result.text.trim();
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const optimizedPaths = JSON.parse(cleanText);
+      console.log('⚡ Generated optimized test paths');
+      return optimizedPaths;
+    } catch (error) {
+      console.warn('Failed to optimize test paths:', error.message);
+      console.warn('Raw LLM response:', result.text);
+      return { optimizedPaths: [], executionStrategy: {} };
+    }
+  }
+
+  /**
+   * 关闭浏览器
+   */
+  async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+      this.page = null;
+      console.log('🔒 Browser closed');
+    }
+  }
+
+  /**
+   * 延迟函数
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 确保目录存在
+   */
+  async ensureDirectoryExists(dirPath) {
+    try {
+      await fs.access(dirPath);
+    } catch {
+      await fs.mkdir(dirPath, { recursive: true });
+    }
+  }
+}
+
+module.exports = Phase2Validation;
