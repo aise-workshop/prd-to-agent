@@ -1,0 +1,35 @@
+{
+  "name": "prd-to-agent",
+  "version": "1.0.0",
+  "description": "AI Agent for generating Puppeteer UI tests from frontend code and user requirements",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "keywords": [
+    "puppeteer",
+    "ai",
+    "testing",
+    "automation",
+    "ui-testing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ai": "^4.0.34",
+    "@ai-sdk/openai": "^1.0.6",
+    "puppeteer": "^23.0.2",
+    "fs-extra": "^11.2.0",
+    "path": "^0.12.7",
+    "glob": "^11.0.0",
+    "cheerio": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4"
+  }
+}

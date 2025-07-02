@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品列表 - Sample E-commerce</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { background: #333; color: white; padding: 20px; margin-bottom: 20px; }
+        .nav { display: flex; gap: 20px; }
+        .nav a { color: white; text-decoration: none; }
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .product-card { border: 1px solid #ddd; border-radius: 5px; padding: 15px; text-align: center; }
+        .product-card img { width: 100%; height: 200px; object-fit: cover; background: #f0f0f0; }
+        .product-price { font-size: 1.2em; font-weight: bold; color: #007bff; }
+        .add-to-cart { background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 3px; cursor: pointer; }
+        .add-to-cart:hover { background: #218838; }
+        .view-details { background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 3px; cursor: pointer; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sample E-commerce</h1>
+        <nav class="nav">
+            <a href="/">首页</a>
+            <a href="/products">商品</a>
+            <a href="/cart">购物车</a>
+            <a href="/login">登录</a>
+        </nav>
+    </div>
+    
+    <h2>商品列表</h2>
+    
+    <div class="products-grid" id="products-container">
+        <!-- Products will be loaded here -->
+    </div>
+    
+    <script>
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products');
+                const products = await response.json();
+                
+                const container = document.getElementById('products-container');
+                container.innerHTML = products.map(product => `
+                    <div class="product-card" data-product-id="${product.id}">
+                        <div class="product-image" style="background: #f0f0f0; height: 200px; margin-bottom: 10px;"></div>
+                        <h3 class="product-name">${product.name}</h3>
+                        <p class="product-price">¥${product.price}</p>
+                        <div>
+                            <button class="add-to-cart" onclick="addToCart(${product.id})">添加到购物车</button>
+                            <button class="view-details" onclick="viewDetails(${product.id})">查看详情</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load products:', error);
+            }
+        }
+        
+        function addToCart(productId) {
+            alert(`商品 ${productId} 已添加到购物车！`);
+        }
+        
+        function viewDetails(productId) {
+            window.location.href = `/product/${productId}`;
+        }
+        
+        // Load products when page loads
+        loadProducts();
+    </script>
+</body>
+</html>

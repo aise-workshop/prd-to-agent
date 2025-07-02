@@ -1,0 +1,13 @@
+{
+  "name": "generated-puppeteer-tests",
+  "version": "1.0.0",
+  "description": "Auto-generated Puppeteer tests",
+  "scripts": {
+    "test": "node test-suite.js",
+    "test:headless": "HEADLESS=true node test-suite.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0",
+    "@jest/globals": "^29.0.0"
+  }
+}
