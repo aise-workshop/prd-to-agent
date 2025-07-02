@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Sample E-commerce</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { background: #333; color: white; padding: 20px; margin-bottom: 20px; }
+        .nav { display: flex; gap: 20px; }
+        .nav a { color: white; text-decoration: none; }
+        .login-form { max-width: 400px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        .submit-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }
+        .submit-btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sample E-commerce</h1>
+        <nav class="nav">
+            <a href="/">首页</a>
+            <a href="/products">商品</a>
+            <a href="/cart">购物车</a>
+            <a href="/login">登录</a>
+        </nav>
+    </div>
+    
+    <div class="login-form">
+        <h2>用户登录</h2>
+        <form id="login-form" action="/api/login" method="POST">
+            <div class="form-group">
+                <label for="username">用户名/邮箱:</label>
+                <input type="text" id="username" name="username" placeholder="请输入用户名或邮箱" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" required>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="login-submit">登录</button>
+        </form>
+        
+        <p style="text-align: center; margin-top: 20px;">
+            没有账户? <a href="/register">立即注册</a>
+        </p>
+    </div>
+    
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert('登录成功！');
+                    window.location.href = '/products';
+                } else {
+                    alert('登录失败，请检查用户名和密码');
+                }
+            } catch (error) {
+                alert('登录过程中发生错误');
+            }
+        });
+    </script>
+</body>
+</html>

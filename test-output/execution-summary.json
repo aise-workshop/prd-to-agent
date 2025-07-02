@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-07-02T03:28:07.621Z",
+  "success": true,
+  "testMode": true,
+  "phases": {
+    "phaseOne": {
+      "success": true,
+      "framework": "unknown",
+      "routeFiles": 1,
+      "testScenarios": 3
+    },
+    "phaseTwo": {
+      "success": true,
+      "validatedScenarios": 3,
+      "refinedTestCases": 1
+    },
+    "phaseThree": {
+      "success": true,
+      "generatedTests": 3,
+      "outputPath": "./test-output"
+    }
+  },
+  "mockData": true,
+  "note": "This is a test run using mock LLM responses"
+}

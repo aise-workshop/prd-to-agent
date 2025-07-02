@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample E-commerce - 首页</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { background: #333; color: white; padding: 20px; margin-bottom: 20px; }
+        .nav { display: flex; gap: 20px; }
+        .nav a { color: white; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        .hero { text-align: center; margin: 40px 0; }
+        .button { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+        .button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sample E-commerce</h1>
+        <nav class="nav">
+            <a href="/">首页</a>
+            <a href="/products">商品</a>
+            <a href="/cart">购物车</a>
+            <a href="/login">登录</a>
+        </nav>
+    </div>
+    
+    <div class="hero">
+        <h2>欢迎来到我们的商店</h2>
+        <p>发现最新、最好的产品</p>
+        <a href="/products" class="button" id="browse-products">浏览商品</a>
+    </div>
+    
+    <div class="features">
+        <h3>我们的特色</h3>
+        <ul>
+            <li>高质量产品</li>
+            <li>快速配送</li>
+            <li>优质客服</li>
+        </ul>
+    </div>
+</body>
+</html>
