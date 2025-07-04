@@ -1,84 +1,208 @@
-我正在实现一个 AI Agent，它可以根据用户的需求（结合读取前端代码和路由）自动生成 puppeteer 的 UI 测试。我希望你能参考你（Augment）的实现，帮我实现这个 AI Agent。你需要：
+# AI Agent for Puppeteer UI Test Generation
 
-- 做一些搜索，看看现在的方案合理不合理
-- 实现对应的方案
-- 出于安全考虑，我在 .env 中配置了你所需要的模型密钥，你可以读取它来测试（DEEPSEEK_TOKEN 是我配置的值 ）
+An intelligent AI agent that automatically generates Puppeteer UI tests based on frontend code analysis and user requirements.
 
-我初步设想的步骤是：
+## Features
 
-- 读取前端代码库的路由等信息，生成初步的测试步骤和方案，比如哪里登录等信息
-- 根据用户的需求生成不同的几个业务测试路径作为参考，比如首页 -> 列表 -> 详情
-- 启动对应的前端服务，然后跳转到对应的登陆页面，自动化抓取 HTML 进行测试 DOM path 的生成
-- 根据测试路径和 PATH，生成代码。
+- **🔍 Code Analysis**: Automatically analyzes frontend codebases to identify routes, components, and architecture
+- **🎯 Smart Test Planning**: Generates comprehensive test scenarios based on user requirements
+- **🤖 Browser Automation**: Uses Puppeteer to validate test scenarios and extract UI elements
+- **⚡ Test Generation**: Creates production-ready Puppeteer test code with Jest integration
+- **🔧 Multi-LLM Support**: Supports DeepSeek, GLM (智谱AI), and OpenAI providers
+- **🛠 Tool Integration**: Built-in tools for filesystem operations and browser automation
 
-我预期的调用模型的方案是三个阶段的：
+## Architecture
 
-阶段一，根据用户的输入和代码，生成工具调用（参考你的实现，可以使用 xml + json，或者纯 json 方式）。我的 AI Agent （Augment）和你一样有几个基本的工具（列出路径、读取代码等），可以考虑使用 MCP 作为工具管理：https://github.com/modelcontextprotocol/typescript-sdk
-如果工具信息不够，可以再调用一次工具
+The system operates in three phases:
 
-阶段二，根据调用结果，生成测试用例和路径等信息，再启动浏览器看看能否正常执行。可以重复三次，需要把前面的结果发给模型确认
+### Phase 1: Code Analysis & Test Planning
+- Analyzes frontend codebase structure and routes
+- Identifies key components and navigation flows
+- Generates initial test scenarios based on user requirements
+- Uses intelligent tool calling for comprehensive code understanding
 
-阶段三，生成对应的 puppeeer 测试代码给用户。
+### Phase 2: Test Validation & Refinement
+- Launches browser automation to validate test scenarios
+- Captures screenshots and extracts UI element information
+- Iteratively refines test scenarios based on validation results
+- Improves selector accuracy and test reliability
 
+### Phase 3: Test Code Generation
+- Generates production-ready Puppeteer test code
+- Creates page object models and test utilities
+- Includes Jest configuration and test data management
+- Provides comprehensive documentation and usage instructions
 
-如下是调用 AI SDK 的代码
+## Installation
 
+```bash
+npm install
 ```
-const ai = require('ai');
-const aiSdkOpenai = require('@ai-sdk/openai');
-generateText = ai.generateText;
-createOpenAI = aiSdkOpenai.createOpenAI;
 
-function configureLLMProvider() {
-  // DeepSeek Provider (Prioritized)
-  if (process.env.DEEPSEEK_TOKEN) {
-    const openai = createOpenAI({
-      compatibility: "compatible",
-      baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1",
-      apiKey: process.env.DEEPSEEK_TOKEN,
-    });
+## Configuration
 
-    return {
-      fullModel: process.env.DEEPSEEK_MODEL || "deepseek-chat",
-      quickModel: process.env.DEEPSEEK_MODEL || "deepseek-chat",
-      openai,
-      providerName: "DeepSeek"
-    };
-  }
+Copy the environment file and configure your API keys:
 
-  // GLM Provider (智谱AI)
-  if (process.env.GLM_API_KEY || process.env.GLM_TOKEN) {
-    const apiKey = process.env.GLM_API_KEY || process.env.GLM_TOKEN;
-    const openai = createOpenAI({
-      compatibility: "compatible",
-      baseURL: process.env.LLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4",
-      apiKey: apiKey,
-    });
-
-    return {
-      fullModel: process.env.LLM_MODEL || "glm-4-air",
-      quickModel: process.env.LLM_MODEL || "glm-4-air",
-      openai,
-      providerName: "GLM"
-    };
-  }
-
-  // OpenAI Provider
-  if (process.env.OPENAI_API_KEY) {
-    const openai = createOpenAI({
-      compatibility: "strict",
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL,
-    });
-
-    return {
-      fullModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      quickModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      openai,
-      providerName: "OpenAI"
-    };
-  }
-
-  return null;
-}
+```bash
+cp .env.example .env
 ```
+
+Edit `.env` with your API credentials:
+
+```env
+# DeepSeek Configuration (Primary)
+DEEPSEEK_TOKEN=your_deepseek_token_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_MODEL=deepseek-chat
+
+# GLM Configuration (智谱AI)
+GLM_API_KEY=your_glm_api_key_here
+LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+LLM_MODEL=glm-4-air
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+
+# Application Configuration
+TARGET_URL=http://localhost:3000
+PUPPETEER_HEADLESS=true
+TEST_OUTPUT_DIR=./generated-tests
+```
+
+## Usage
+
+### Command Line Interface
+
+```bash
+# Full generation process
+node src/index.js --requirement "Test login and dashboard flow" --url http://localhost:3000
+
+# Quick generation without validation
+node src/index.js --mode quick --requirement "Test user registration"
+
+# Analyze codebase only
+node src/index.js --mode analyze --requirement "Analyze routes and components"
+
+# Custom project path
+node src/index.js --project /path/to/your/frontend --requirement "Test e-commerce flow"
+```
+
+### Programmatic Usage
+
+```javascript
+const { UITestGenerator } = require('./src/index');
+
+const generator = new UITestGenerator();
+
+const results = await generator.run({
+  mode: 'full',
+  projectPath: '/path/to/your/frontend/project',
+  userRequirement: 'Test the complete user login flow',
+  targetUrl: 'http://localhost:3000',
+  maxIterations: 3
+});
+
+console.log('Generated tests:', results.phase3.testFiles);
+```
+
+## CLI Options
+
+- `--mode <mode>`: Generation mode (full, quick, analyze, validate)
+- `--project <path>`: Path to frontend project
+- `--url <url>`: Target URL for testing
+- `--requirement <text>`: User requirement description
+- `--iterations <number>`: Max validation iterations
+- `--output <path>`: Output directory
+
+## Generated Output
+
+The system generates:
+
+- **Main test suite** (`ui-tests.test.js`)
+- **Page object models** (`page-objects/`)
+- **Test utilities** (`test-helpers.js`)
+- **Test configuration** (`jest.config.js`)
+- **Test data** (`test-data.json`)
+- **Documentation** (`README.md`)
+
+## Examples
+
+### React Application
+```javascript
+await generator.run({
+  mode: 'full',
+  projectPath: '/path/to/react/app',
+  userRequirement: `
+    Test the e-commerce flow:
+    1. User registration and login
+    2. Browse products and add to cart
+    3. Checkout process
+    4. Order confirmation
+  `,
+  targetUrl: 'http://localhost:3000'
+});
+```
+
+### Vue.js Application
+```javascript
+await generator.run({
+  mode: 'full',
+  projectPath: '/path/to/vue/app',
+  userRequirement: `
+    Test the admin dashboard:
+    1. Admin login
+    2. User management operations
+    3. Settings configuration
+  `,
+  targetUrl: 'http://localhost:8080'
+});
+```
+
+## Supported Frameworks
+
+- ✅ React
+- ✅ Vue.js
+- ✅ Angular
+- ✅ Next.js
+- ✅ Generic HTML/JS applications
+
+## LLM Provider Support
+
+The system prioritizes providers in this order:
+1. **DeepSeek** (if `DEEPSEEK_TOKEN` is set)
+2. **GLM (智谱AI)** (if `GLM_API_KEY` is set)
+3. **OpenAI** (if `OPENAI_API_KEY` is set)
+
+## Tool System
+
+Built-in tools include:
+- **FileSystem Tool**: Code analysis and file operations
+- **Puppeteer Tool**: Browser automation and UI element extraction
+- **Tool Registry**: Extensible tool management system
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Run tests
+npm test
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details

@@ -1,0 +1,58 @@
+const axios = require('axios');
+const BaseLLM = require('./BaseLLM');
+
+class GLMLLM extends BaseLLM {
+  constructor(config) {
+    super(config);
+    this.apiKey = config.apiKey || process.env.GLM_API_KEY;
+    this.baseURL = config.baseURL || process.env.LLM_BASE_URL;
+    this.model = config.model || process.env.LLM_MODEL || 'glm-4-air';
+  }
+
+  async chat(messages, tools = null) {
+    const formattedTools = this.formatTools(tools);
+    
+    const payload = {
+      model: this.model,
+      messages: this.formatMessages(messages),
+      temperature: 0.7,
+      max_tokens: 4096
+    };
+
+    if (formattedTools) {
+      payload.tools = formattedTools;
+      payload.tool_choice = 'auto';
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseURL}/chat/completions`,
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const toolCalls = this.parseToolCalls(response.data);
+      if (toolCalls) {
+        return {
+          content: response.data.choices[0].message.content || '',
+          toolCalls
+        };
+      }
+
+      return {
+        content: response.data.choices[0].message.content,
+        toolCalls: null
+      };
+    } catch (error) {
+      console.error('GLM API Error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+}
+
+module.exports = GLMLLM;
