@@ -1,6 +1,5 @@
 # Puppeteer UI 测试自动生成 AI Agent
 
-## 项目目标
 实现一个 AI Agent，能够自动分析前端代码库并生成 Puppeteer UI 测试代码。
 
 ## 核心功能
